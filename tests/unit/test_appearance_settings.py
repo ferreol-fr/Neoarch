@@ -36,7 +36,8 @@ class _FakeThemeManager:
         self.current_id = theme_id
         return True
 
-    def reload(self):
+    @staticmethod
+    def reload():
         return True
 
 
@@ -400,10 +401,12 @@ def test_apply_window_effects_updates_real_widget(qapp):
                 "window_radius": 8,
             }
 
-        def _window_mode(self):
+        @staticmethod
+        def _window_mode():
             return WINDOW_MODE_SYSTEM
 
-        def centralWidget(self):
+        @staticmethod
+        def centralWidget():
             return None
 
     window = _Window(True)
@@ -444,10 +447,12 @@ def test_wallpaper_theme_stays_transparent(qapp):
             }
             self._theme_manager = _Manager()
 
-        def _window_mode(self):
+        @staticmethod
+        def _window_mode():
             return WINDOW_MODE_NEOARCH
 
-        def centralWidget(self):
+        @staticmethod
+        def centralWidget():
             return None
 
     old_effects = (
@@ -525,11 +530,13 @@ def test_import_export_preserves_system_transparency(tmp_path, monkeypatch):
             }
             self.rebuilt = False
 
-        def log(self, _message):
-            pass
+        @staticmethod
+        def log(*_args):
+            return None
 
-        def _show_message(self, _title, _message):
-            pass
+        @staticmethod
+        def _show_message(*_args):
+            return None
 
         def build_settings_ui(self):
             self.rebuilt = True
@@ -577,10 +584,12 @@ def test_apply_window_effects_uses_theme_defined_glow(qapp):
                 "window_radius": 8,
             }
 
-        def _window_mode(self):
+        @staticmethod
+        def _window_mode():
             return WINDOW_MODE_NEOARCH
 
-        def centralWidget(self):
+        @staticmethod
+        def centralWidget():
             return None
 
     window = _Window()
@@ -611,3 +620,29 @@ def test_apply_window_effects_skips_before_settings_loaded(qapp):
         pass
 
     assert _SettingsMixin.apply_window_effects(_Uninitialised()) is None
+
+
+def test_locked_theme_apply_downloads_full_wallpaper(qapp, monkeypatch):
+    from neoarch.backend.services import theme_assets
+
+    class _UiCall:
+        @staticmethod
+        def emit(callback):
+            callback()
+
+    app = _FakeApp(WINDOW_MODE_NEOARCH)
+    app.ui_call = _UiCall()
+    calls = []
+
+    def _download(theme_id, callback):
+        calls.append(theme_id)
+        callback(theme_id, "/tmp/wallpaper.jpg")
+
+    monkeypatch.setattr(theme_assets, "needs_download", lambda theme_id: True)
+    monkeypatch.setattr(theme_assets, "download_async", _download)
+    widget = AppearanceSettingsWidget(app)
+
+    widget._apply_theme_with_wallpaper("neoarch-pro-moss")
+
+    assert calls == ["neoarch-pro-moss"]
+    assert app._theme_manager.current_id == "neoarch-pro-moss"
